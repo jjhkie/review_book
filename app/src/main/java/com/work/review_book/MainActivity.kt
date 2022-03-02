@@ -1,5 +1,7 @@
 package com.work.review_book
 
+import android.annotation.SuppressLint
+import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
@@ -7,7 +9,6 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import androidx.core.view.isVisible
 import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.room.Room
 import com.work.review_book.adapter.BookAdapter
 import com.work.review_book.adapter.HistoryAdapter
 import com.work.review_book.api.BookService
@@ -33,16 +34,13 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
-
         setContentView(binding.root)
+
         initBookRecyclerView()
         initHistoryRecyclerView()
 
-        db = Room.databaseBuilder(
-            applicationContext,
-            AppDatabase::class.java,
-            "BookSearchDB"
-        ).build()
+        db = getAppDatabase(this)
+
 
         val retrofit = Retrofit.Builder()
             .baseUrl("https://book.interpark.com")
@@ -85,14 +83,7 @@ class MainActivity : AppCompatActivity() {
 
             })
 
-        //검색 기능 만들기
-        binding.searchEditText.setOnKeyListener { view, keyCode, keyEvent ->
-            if (keyCode == KeyEvent.KEYCODE_ENTER && keyEvent.action == MotionEvent.ACTION_DOWN) {
-                search(binding.searchEditText.text.toString())
-                return@setOnKeyListener true
-            }
-            return@setOnKeyListener false
-        }
+
 
     }
 
@@ -105,6 +96,7 @@ class MainActivity : AppCompatActivity() {
                     response: Response<SearchBookDto>
                 ) {
                     //TODO 성공처리
+                    hideHistoryView()
                     saveSearchKeyword(keyword)
 
                     if (response.isSuccessful.not()) {
@@ -118,14 +110,20 @@ class MainActivity : AppCompatActivity() {
                 //응답이 실패일 때
                 override fun onFailure(call: Call<SearchBookDto>, t: Throwable) {
                     //TODO 실패처리
+                    hideHistoryView()
                     Log.d(TAG, t.toString())
                 }
 
             })
     }
 
+    //recyclerView Click 했을 때
     private fun initBookRecyclerView() {
-        adapter = BookAdapter()
+        adapter = BookAdapter(itemClickedListener = {
+            val intent = Intent(this, DetailActivity::class.java)
+            intent.putExtra("bookModel", it)
+            startActivity(intent)
+        })
 
         binding.bookRecyclerView.layoutManager = LinearLayoutManager(this)
         binding.bookRecyclerView.adapter = adapter
@@ -136,13 +134,41 @@ class MainActivity : AppCompatActivity() {
         historyAdapter = HistoryAdapter(historyDeleteClickedListener = {
             deleteSearchKeyword(it)
         })
+
+        binding.historyRecyclerView.layoutManager = LinearLayoutManager(this)
+        binding.historyRecyclerView.adapter = historyAdapter
+        initSearchEditText()
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    private fun initSearchEditText(){
+        //검색 기능 만들기
+        binding.searchEditText.setOnKeyListener { view, keyCode, keyEvent ->
+            if (keyCode == KeyEvent.KEYCODE_ENTER && keyEvent.action == MotionEvent.ACTION_DOWN) {
+                search(binding.searchEditText.text.toString())
+                return@setOnKeyListener true
+            }
+            return@setOnKeyListener false
+        }
+        binding.searchEditText.setOnTouchListener { v, event ->
+            if(event.action == MotionEvent.ACTION_DOWN){
+                showHistoryView()
+                return@setOnTouchListener true
+            }
+            return@setOnTouchListener false
+        }
     }
 
     //hisotyRecycler visibility
     private fun showHistoryView(){
         Thread{
-            val keywords = db.historyDao().getAll().reversed()
-        }
+            val Keywords = db.historyDao().getAll().reversed()
+
+            runOnUiThread {
+                binding.historyRecyclerView.isVisible = true
+                historyAdapter.submitList(Keywords.orEmpty())
+            }
+        }.start()
 
         binding.historyRecyclerView.isVisible =true
     }
@@ -160,8 +186,8 @@ class MainActivity : AppCompatActivity() {
     private fun deleteSearchKeyword(keyword: String){
         Thread{
             db.historyDao().delete(keyword)
-            //TODO view 갱신
-        }
+            showHistoryView()
+       }.start()
     }
 
     companion object {

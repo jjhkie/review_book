@@ -9,7 +9,8 @@ import com.bumptech.glide.Glide
 import com.work.review_book.databinding.ItemBookBinding
 import com.work.review_book.model.Book
 
-class BookAdapter : ListAdapter<Book, BookAdapter.BookItemViewHolder>(diffUtil) {
+class BookAdapter(private val itemClickedListener: (Book) -> Unit) :
+    ListAdapter<Book, BookAdapter.BookItemViewHolder>(diffUtil) {
 
 
     //binding: ItemBookBinding을 사용하여 item_book에 있는 뷰에 접근 가능능
@@ -21,6 +22,9 @@ class BookAdapter : ListAdapter<Book, BookAdapter.BookItemViewHolder>(diffUtil) 
             binding.titleTextView.text = bookModel.title
             binding.descriptionTextView.text = bookModel.description
 
+            binding.root.setOnClickListener {
+                itemClickedListener(bookModel)
+            }
             //서버에서 이미지를 받아오는 방법
             Glide
                 .with(binding.coverImageView.context)
@@ -45,8 +49,8 @@ class BookAdapter : ListAdapter<Book, BookAdapter.BookItemViewHolder>(diffUtil) 
 
     //view position이 변경되었을 때 새로운 값을 할당할지의 기준
 
-    companion object{
-        val diffUtil = object: DiffUtil.ItemCallback<Book>(){
+    companion object {
+        val diffUtil = object : DiffUtil.ItemCallback<Book>() {
             override fun areItemsTheSame(oldItem: Book, newItem: Book): Boolean {
                 return oldItem == newItem
             }

@@ -56,4 +56,3 @@ class HistoryAdapter(val historyDeleteClickedListener: (String) -> Unit): ListAd
 
 }
 
-}
